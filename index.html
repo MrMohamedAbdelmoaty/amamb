@@ -45,8 +45,8 @@
     <p class="muted" data-i18n="signinToContinue">سجّل دخولك للمتابعة</p>
 
     <form id="loginForm" autocomplete="on">
-      <label for="loginEmail" data-i18n="email">البريد الإلكتروني</label>
-      <input id="loginEmail" type="email" required dir="ltr" placeholder="you@school.com" autocomplete="username" />
+      <label for="loginEmail" data-i18n="identifier">البريد أو الهاتف</label>
+      <input id="loginEmail" type="text" required dir="ltr" placeholder="you@school.com أو 9665xxxxxxxx" autocomplete="username" inputmode="email" />
 
       <label for="loginPassword" data-i18n="password">كلمة المرور</label>
       <input id="loginPassword" type="password" required dir="ltr" placeholder="••••••••" autocomplete="current-password" />
@@ -57,16 +57,22 @@
       <div id="loginError" class="error-text hidden"></div>
     </form>
 
-    <button class="btn ghost block" id="langToggleLogin" style="margin-top:10px">🌐 العربية / English</button>
-
-    <div class="demo-box">
-      <div class="demo-title" data-i18n="demoAccounts">حسابات تجريبية (اضغط للتعبئة)</div>
-      <div class="demo-chips">
-        <button type="button" class="demo-chip" data-email="admin@amamb.com" data-pass="admin123">👑 <b>Admin</b> admin@amamb.com</button>
-        <button type="button" class="demo-chip" data-email="teacher@amamb.com" data-pass="teacher123">🧑‍🏫 <b>Teacher</b> teacher@amamb.com</button>
-        <button type="button" class="demo-chip" data-email="student@amamb.com" data-pass="student123">🎒 <b>Student</b> student@amamb.com</button>
+    <!-- OTP step (shown after the password step) -->
+    <div id="otpView" class="hidden" style="text-align:center">
+      <div style="font-size:2.1rem;line-height:1">🔐</div>
+      <h1 data-i18n="otpTitle" style="margin:.35rem 0 .2rem">رمز التحقق</h1>
+      <p class="muted" style="font-size:.85rem;margin:0 0 .4rem"><span data-i18n="otpDesc">بعتنا كود من ٦ أرقام إلى</span><br><b id="otpEmail" dir="ltr" style="display:inline-block;margin-top:2px"></b></p>
+      <label for="otpCode" data-i18n="otpCodeLabel" style="text-align:start">رمز التحقق (٦ أرقام)</label>
+      <input id="otpCode" class="otp-code" type="text" inputmode="numeric" pattern="[0-9]*" maxlength="6" autocomplete="one-time-code" dir="ltr" placeholder="••••••" />
+      <button class="btn primary block lg" id="otpVerifyBtn" style="margin-top:12px"><span data-i18n="otpVerify">تحقق ودخول</span></button>
+      <div id="otpError" class="error-text hidden"></div>
+      <div style="display:flex;justify-content:space-between;margin-top:10px;gap:.5rem">
+        <button class="btn ghost small" id="otpBackBtn">→ <span data-i18n="otpBack">رجوع</span></button>
+        <button class="btn ghost small" id="otpResendBtn"><span data-i18n="otpResend">إعادة إرسال الرمز</span></button>
       </div>
     </div>
+
+    <button class="btn ghost block" id="langToggleLogin" style="margin-top:10px">🌐 العربية / English</button>
     <div class="login-foot">AMAMB © 2026 · Al-Noor International School</div>
   </div>
 </div>

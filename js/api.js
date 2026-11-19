@@ -59,6 +59,17 @@ function sha256Sync(ascii) {
   return result;
 }
 
+/* ---------- Phone helpers ---------- */
+function normalizePhone(p) {
+  let d = String(p || '').replace(/[^\d]/g, '');
+  if (d.startsWith('00')) d = d.slice(2);
+  return d;
+}
+function isPhoneLike(v) {
+  const t = String(v || '').trim();
+  return /^\+?[0-9][0-9\s()-]{6,}$/.test(t);
+}
+
 /* ---------- PostgREST helpers ---------- */
 const API = {
   base: AMAMB_CONFIG.SUPABASE_URL + '/rest/v1/',
@@ -104,12 +115,16 @@ const API = {
     return out;
   },
   // auth -----------------------------------------------------------
-  // NOTE: hashing happens client-side (demo). Server-side verification is
-  // pending — tracked in the repo TODO.
-  async login(email, password) {
+  // Identifier = email OR phone. On success the app may require a one-time
+  // code sent to the account email (AMAMB_CONFIG.OTP_REQUIRED).
+  async login(identifier, password) {
     const hash = sha256Sync(password);
-    const rows = await this.select('profiles',
-      'select=id,email,name,role,school_id&email=eq.' + encodeURIComponent(email.trim().toLowerCase()) + '&password_hash=eq.' + hash);
+    const value = String(identifier || '').trim();
+    const cols = 'select=id,email,name,role,school_id,phone';
+    const query = isPhoneLike(value)
+      ? cols + '&phone=eq.' + encodeURIComponent(normalizePhone(value)) + '&password_hash=eq.' + hash
+      : cols + '&email=eq.' + encodeURIComponent(value.toLowerCase()) + '&password_hash=eq.' + hash;
+    const rows = await this.select('profiles', query);
     if (!rows || !rows.length) throw new Error('INVALID_CREDENTIALS');
     const u = rows[0];
     if (u.role !== 'admin' && u.school_id) {
@@ -120,6 +135,23 @@ const API = {
       u.school_name = sch && sch.length ? sch[0].name : '';
     }
     return u;
+  },
+  async sendOtp(email) {
+    const res = await fetch(AMAMB_CONFIG.SUPABASE_URL + '/auth/v1/otp', {
+      method: 'POST',
+      headers: Object.assign({ 'Content-Type': 'application/json' }, this.headers()),
+      body: JSON.stringify({ email: String(email || '').trim().toLowerCase(), create_user: true })
+    });
+    if (!res.ok) throw new Error('OTP_SEND');
+    return true;
+  },
+  async verifyOtp(email, token) {
+    const res = await fetch(AMAMB_CONFIG.SUPABASE_URL + '/auth/v1/verify', {
+      method: 'POST',
+      headers: Object.assign({ 'Content-Type': 'application/json' }, this.headers()),
+      body: JSON.stringify({ email: String(email || '').trim().toLowerCase(), token: String(token || '').trim(), type: 'email' })
+    });
+    return res.ok;
   }
 };
 

@@ -12,5 +12,7 @@ const AMAMB_CONFIG = {
   SUPABASE_URL: "https://mxseuwlhhkqkpgofecoa.supabase.co",
   SUPABASE_ANON_KEY: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im14c2V1d2xoaGtxa3Bnb2ZlY29hIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTM1MTkwMzcsImV4cCI6MjEwOTA5NTAzN30.FIDldAqwaE5XlE_PF74p_lR88huAqzqJaO65L7ya6W0",
   SESSION_KEY: "amamb_session_v1",
-  LANG_KEY: "amamb_lang"
+  LANG_KEY: "amamb_lang",
+  /* One-time email code after the password step (set false to disable) */
+  OTP_REQUIRED: true
 };
