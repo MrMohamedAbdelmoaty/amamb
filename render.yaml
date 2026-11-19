@@ -2,7 +2,6 @@ services:
   - type: web
     name: amamb
     runtime: static
-    plan: free
     buildCommand: echo "AMAMB is a static site — no build step"
     staticPublishPath: .
     pullRequestPreviewsEnabled: false
