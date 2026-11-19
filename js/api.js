@@ -99,7 +99,7 @@ const API = {
   // table helpers -------------------------------------------------
   select(table, query) { return this.req(table + '?' + (query || 'select=*')); },
   // profiles: representation never includes password_hash (column is not readable by the anon role)
-  SAFE_PROFILE_COLS: 'id,email,name,role,school_id',
+  SAFE_PROFILE_COLS: 'id,email,name,role,school_id,status',
   async insert(table, rows) {
     const q = table === 'profiles' ? '?select=' + this.SAFE_PROFILE_COLS : '';
     const out = await this.req(table + q, { method: 'POST', body: rows, prefer: 'return=representation' });
@@ -120,13 +120,14 @@ const API = {
   async login(identifier, password) {
     const hash = sha256Sync(password);
     const value = String(identifier || '').trim();
-    const cols = 'select=id,email,name,role,school_id,phone';
+    const cols = 'select=id,email,name,role,school_id,phone,status';
     const query = isPhoneLike(value)
       ? cols + '&phone=eq.' + encodeURIComponent(normalizePhone(value)) + '&password_hash=eq.' + hash
       : cols + '&email=eq.' + encodeURIComponent(value.toLowerCase()) + '&password_hash=eq.' + hash;
     const rows = await this.select('profiles', query);
     if (!rows || !rows.length) throw new Error('INVALID_CREDENTIALS');
     const u = rows[0];
+    if (u.status && u.status !== 'active') throw new Error('ACCOUNT_INACTIVE');
     if (u.role !== 'admin' && u.school_id) {
       const sch = await this.select('schools', 'select=id,name,subscription_status&id=eq.' + u.school_id);
       if (sch && sch.length && sch[0].subscription_status === 'suspended') {

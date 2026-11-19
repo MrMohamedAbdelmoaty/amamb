@@ -31,7 +31,16 @@ const App = {
       I('schools', '🏫', 'navSchools', 'secManage', r => AdminPages.schools(r)),
       I('teachers', '🧑‍🏫', 'navTeachers', 'secManage', r => AdminPages.teachers(r)),
       I('students', '🎒', 'navStudents', 'secManage', r => AdminPages.students(r)),
-      I('subscriptions', '💳', 'navSubscriptions', 'secManage', r => AdminPages.subscriptions(r))
+      I('sections', '🏫', 'navSections', 'secManage', r => AdminPages2.sections(r)),
+      I('roles', '🛡️', 'navRoles', 'secManage', r => AdminPages2.roles(r)),
+      I('subscriptions', '💳', 'navSubscriptions', 'secManage', r => AdminPages.subscriptions(r)),
+      I('curricula', '📚', 'navCurricula', 'secContent', r => AdminPages2.curricula(r)),
+      I('lessons', '📖', 'navLessons', 'secContent', r => AdminPages2.lessons(r)),
+      I('questionBank', '🧩', 'navQuestionBank', 'secContent', r => AdminPages2.questions(r)),
+      I('exams', '📝', 'navExams', 'secContent', r => ExamPages.admin(r)),
+      I('chemistry', '🧪', 'navChemistry', 'secChemistry', r => ChemPages.render(r, true)),
+      I('messages', '✉️', 'navMessages', 'secSystem', r => Messenger.render(r)),
+      I('auditLog', '🕵️', 'navAudit', 'secSystem', r => AdminPages2.auditLog(r))
     ];
     if (role === 'teacher') return [
       I('dashboard', '📊', 'navDashboard', 'secOverview', r => TeacherPages.dashboard(r)),
@@ -46,7 +55,10 @@ const App = {
       I('plans', '📋', 'navPlans', 'secTeach', r => TeacherPages.plans(r)),
       I('certificates', '🎓', 'navCertificates', 'secTeach', r => TeacherPages.certificates(r)),
       I('schedule', '🗓️', 'navSchedule', 'secTeach', r => TeacherPages.schedule(r)),
-      I('export', '📥', 'navExport', 'secTeach', r => TeacherPages.exportPage(r))
+      I('export', '📥', 'navExport', 'secTeach', r => TeacherPages.exportPage(r)),
+      I('passRate', '✅', 'navTracking', 'secTeach', r => TrackingPages.passRate(r)),
+      I('chemistry', '🧪', 'navChemistry', 'secTeach', r => ChemPages.render(r, false)),
+      I('messages', '✉️', 'navMessages', 'secTeach', r => Messenger.render(r))
     ];
     // student
     return [
@@ -58,7 +70,10 @@ const App = {
       I('myReport', '📄', 'navMyReport', 'secMe', r => StudentPages.report(r)),
       I('timetable', '📅', 'navTimetable', 'secMe', r => StudentPages.timetable(r)),
       I('checkin', '📲', 'navCheckin', 'secMe', r => StudentPages.checkin(r)),
-      I('myBehavior', '🧭', 'navMyBehavior', 'secMe', r => StudentPages.behavior(r))
+      I('myBehavior', '🧭', 'navMyBehavior', 'secMe', r => StudentPages.behavior(r)),
+      I('exams', '📝', 'navExams', 'secMe', r => ExamPages.student(r)),
+      I('chemistry', '🧪', 'navChemistry', 'secMe', r => ChemPages.render(r, false)),
+      I('messages', '✉️', 'navMessages', 'secMe', r => Messenger.render(r))
     ];
   },
 
@@ -138,7 +153,7 @@ const App = {
       await this.finishLogin(user);
     } catch (e) {
       const code = (e && e.message) || '';
-      errEl.textContent = code === 'INVALID_CREDENTIALS' ? t('invalidCredentials') : code === 'SCHOOL_SUSPENDED' ? t('schoolSuspended') : t('dbError');
+      errEl.textContent = code === 'INVALID_CREDENTIALS' ? t('invalidCredentials') : code === 'SCHOOL_SUSPENDED' ? t('schoolSuspended') : code === 'ACCOUNT_INACTIVE' ? t('accountInactive') : t('dbError');
       errEl.classList.remove('hidden');
     }
   },

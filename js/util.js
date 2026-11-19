@@ -80,3 +80,18 @@ function printHtml(html) {
 function emptyState(msg) {
   return `<div class="card text-center muted" style="padding:2.5rem 1rem"><div style="font-size:2.2rem;margin-bottom:.4rem">🗂️</div>${escapeHtml(msg || t('noData'))}</div>`;
 }
+
+/* ---------- Audit log (who changed what) ---------- */
+async function audit(action, entity, entityId, details) {
+  try {
+    const u = (typeof Session !== 'undefined' && Session.get && Session.get()) || null;
+    await API.insert('audit_log', [{
+      actor_id: u && u.id ? u.id : null,
+      actor_email: u && u.email ? u.email : null,
+      action: String(action || 'unknown'),
+      entity: entity || null,
+      entity_id: entityId || null,
+      details: details || null
+    }]);
+  } catch (e) { /* audit must never break the app */ }
+}

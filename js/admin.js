@@ -93,6 +93,7 @@ const AdminPages = {
       $$('[data-del-school]', root).forEach(b => b.addEventListener('click', () => {
         confirmModal(t('confirmDelete'), async () => {
           await API.remove('schools', 'id=eq.' + b.dataset.delSchool);
+          await audit('delete', 'schools', b.dataset.delSchool, {});
           toast(t('deleted'), 'success');
           this.schools(root);
         }, true);
@@ -123,6 +124,7 @@ const AdminPages = {
             const body = { name, code: $('#fSchoolCode', mroot).value.trim() || null, plan: $('#fSchoolPlan', mroot).value, subscription_status: $('#fSchoolStatus', mroot).value };
             if (editing) await API.update('schools', 'id=eq.' + school.id, body);
             else await API.insert('schools', [body]);
+            await audit(editing ? 'update' : 'create', 'schools', editing ? school.id : null, { name });
             closeModal(); toast(t('saved'), 'success'); AdminPages.schools(root);
           });
         }
@@ -151,6 +153,7 @@ const AdminPages = {
             <td dir="ltr">${escapeHtml(tch.email)}</td>
             <td>${escapeHtml(schoolName(tch.school_id))}</td>
             <td style="white-space:nowrap">
+              <button class="btn ghost small" data-link-secs="${tch.id}" title="${getLang() === 'ar' ? 'ربط الشعب' : 'Link sections'}">🔗</button>
               <button class="btn ghost small" data-reset="${tch.id}">🔑 ${t('resetPassword')}</button>
               <button class="btn ghost small" data-del-teacher="${tch.id}">🗑️</button>
             </td></tr>`).join('') || `<tr><td colspan="4" class="muted text-center">${t('noData')}</td></tr>`}</tbody>
@@ -181,6 +184,35 @@ const AdminPages = {
       });
     });
 
+    $$('[data-link-secs]', root).forEach(b => b.addEventListener('click', async () => {
+      const tch = teachers.find(x => x.id === b.dataset.linkSecs);
+      if (!tch.school_id) return toast(getLang() === 'ar' ? 'عيّن مدرسة للمعلم أولاً' : 'Assign a school to this teacher first', 'error');
+      const schoolSections = (await API.select('sections', 'select=id,grade,name,teacher_id&school_id=eq.' + encodeURIComponent(tch.school_id) + '&order=grade,name')) || [];
+      openModal({
+        title: (getLang() === 'ar' ? 'ربط الشعب بالمعلم: ' : 'Link sections to: ') + tch.name,
+        bodyHtml: `<p class="small muted">${getLang() === 'ar' ? 'حدد الشعب التي يدرّسها هذا المعلم' : 'Check the sections this teacher teaches'}</p>
+          <div style="display:flex;flex-direction:column;gap:.35rem;max-height:50vh;overflow:auto">
+            ${schoolSections.map(s => `<label class="card" style="margin:0;box-shadow:none;padding:.45rem .6rem;display:flex;gap:.55rem;align-items:center;cursor:pointer"><input type="checkbox" class="link-sec-pick" value="${s.id}" ${s.teacher_id === tch.id ? 'checked' : ''}> <span><b>${escapeHtml(((s.grade || '') + ' ' + (s.name || '')).trim())}</b>${s.teacher_id && s.teacher_id !== tch.id ? ' <span class="small muted">(' + (getLang() === 'ar' ? 'مرتبط بمعلم آخر' : 'linked to another teacher') + ')</span>' : ''}</span></label>`).join('') || `<div class="muted">${getLang() === 'ar' ? 'لا توجد شعب في هذه المدرسة' : 'No sections in this school'}</div>`}
+          </div>`,
+        footHtml: `<button class="btn ghost" data-close-modal>${t('cancel')}</button><button class="btn primary" id="saveLinkSecsBtn">${t('save')}</button>`,
+        onOpen(mroot) {
+          $('#saveLinkSecsBtn', mroot).addEventListener('click', async () => {
+            const picked = new Set($$('.link-sec-pick', mroot).filter(x => x.checked).map(x => x.value));
+            try {
+              for (const s of schoolSections) {
+                const shouldHave = picked.has(s.id);
+                const has = s.teacher_id === tch.id;
+                if (shouldHave && !has) await API.update('sections', 'id=eq.' + s.id, { teacher_id: tch.id });
+                else if (!shouldHave && has) await API.update('sections', 'id=eq.' + s.id, { teacher_id: null });
+              }
+              await audit('link-sections', 'sections', null, { teacher: tch.email, sections: Array.from(picked) });
+              closeModal(); toast(t('saved'), 'success'); AdminPages.teachers(root);
+            } catch (e) { toast(t('dbError'), 'error'); }
+          });
+        }
+      });
+    }));
+
     $$('[data-reset]', root).forEach(b => b.addEventListener('click', () => {
       openModal({
         title: t('resetPassword'),
@@ -205,31 +237,151 @@ const AdminPages = {
     }));
   },
 
-  /* ========== 4) Students (all schools) ========== */
+  /* ========== 4) Students (all schools) — full CRUD ========== */
   async students(root) {
     root.innerHTML = `<div class="card">${t('loading')}</div>`;
     const [schools, sections, students] = await Promise.all([
       API.select('schools', 'select=id,name&order=name'),
-      API.select('sections', 'select=id,grade,name,school_id'),
+      API.select('sections', 'select=id,grade,name,school_id&order=grade,name'),
       API.select('students', 'select=*&order=name')
     ]);
     const schoolName = id => (schools.find(s => s.id === id) || {}).name || '—';
-    const sectionLabel = id => { const s = sections.find(x => x.id === id); return s ? `${s.grade || ''} ${s.name || ''}`.trim() : '—'; };
+    const sectionLabel = id => { const s = sections.find(x => x.id === id); return s ? ((s.grade || '') + ' ' + (s.name || '')).trim() : '—'; };
+    const render = () => {
+      root.innerHTML = `
+        <div class="card">
+          <div class="card-head"><div class="card-title">🎒 ${t('navStudents')} (${(students || []).length})</div>
+            <button class="btn primary" id="addStudentBtn">+ ${getLang() === 'ar' ? 'إضافة طالب' : 'Add student'}</button></div>
+          <div class="table-wrap"><table class="tbl">
+            <thead><tr><th>${t('name')}</th><th>${t('assignSchool')}</th><th>${t('section')}</th><th>PIN</th><th>WhatsApp</th><th>${t('actions')}</th></tr></thead>
+            <tbody>${(students || []).map(s => `<tr>
+              <td><b>${escapeHtml(s.name)}</b>${s.user_id ? ' <span class="pill blue small">🔑 ' + (getLang() === 'ar' ? 'له حساب' : 'login') + '</span>' : ''}</td>
+              <td>${escapeHtml(schoolName(s.school_id))}</td>
+              <td>${escapeHtml(sectionLabel(s.section_id))}</td>
+              <td dir="ltr">${escapeHtml(s.pin || '—')}</td>
+              <td dir="ltr">${escapeHtml(s.parent_whatsapp || '—')}</td>
+              <td style="white-space:nowrap">
+                <button class="btn ghost small" data-edit-student="${s.id}">✏️</button>
+                <button class="btn ghost small" data-login-student="${s.id}" title="${getLang() === 'ar' ? 'حساب دخول' : 'Login account'}">🔑</button>
+                <button class="btn ghost small" data-del-student="${s.id}">🗑️</button>
+              </td>
+            </tr>`).join('') || `<tr><td colspan="6" class="muted text-center">${t('noData')}</td></tr>`}</tbody>
+          </table></div>
+        </div>`;
 
-    root.innerHTML = `
-      <div class="card">
-        <div class="card-head"><div class="card-title">🎒 ${t('navStudents')} (${(students || []).length})</div></div>
-        <div class="table-wrap"><table class="tbl">
-          <thead><tr><th>${t('name')}</th><th>${t('assignSchool')}</th><th>${t('section')}</th><th>PIN</th><th>WhatsApp</th></tr></thead>
-          <tbody>${(students || []).map(s => `<tr>
-            <td><b>${escapeHtml(s.name)}</b></td>
-            <td>${escapeHtml(schoolName(s.school_id))}</td>
-            <td>${escapeHtml(sectionLabel(s.section_id))}</td>
-            <td dir="ltr">${escapeHtml(s.pin || '—')}</td>
-            <td dir="ltr">${escapeHtml(s.parent_whatsapp || '—')}</td>
-          </tr>`).join('') || `<tr><td colspan="5" class="muted text-center">${t('noData')}</td></tr>`}</tbody>
-        </table></div>
-      </div>`;
+      const sectionOptions = (selSchool, selected) => {
+        const list = (sections || []).filter(s => !selSchool || s.school_id === selSchool);
+        return `<option value="">${getLang() === 'ar' ? 'بدون شعبة' : 'No section'}</option>` +
+          list.map(s => `<option value="${s.id}" ${s.id === selected ? 'selected' : ''}>${escapeHtml(((s.grade || '') + ' ' + (s.name || '')).trim())} — ${escapeHtml(schoolName(s.school_id))}</option>`).join('');
+      };
+
+      $('#addStudentBtn', root).addEventListener('click', () => {
+        openModal({
+          title: getLang() === 'ar' ? 'إضافة طالب' : 'Add student',
+          bodyHtml: `
+            <div class="form-row"><div><label>${t('name')} *</label><input class="input" id="fStuName"></div></div>
+            <div class="form-row cols-2">
+              <div><label>PIN</label><input class="input" id="fStuPin" dir="ltr" inputmode="numeric" maxlength="8"></div>
+              <div><label>WhatsApp</label><input class="input" id="fStuWa" dir="ltr" placeholder="9665xxxxxxxx"></div>
+            </div>
+            <div class="form-row"><div><label>${t('section')}</label><select class="input" id="fStuSection">${sectionOptions('', '')}</select></div></div>`,
+          footHtml: `<button class="btn ghost" data-close-modal>${t('cancel')}</button><button class="btn primary" id="saveStuBtn">${t('save')}</button>`,
+          onOpen(mroot) {
+            $('#saveStuBtn', mroot).addEventListener('click', async () => {
+              const name = $('#fStuName', mroot).value.trim();
+              if (!name) return toast(t('required'), 'error');
+              const sectionId = $('#fStuSection', mroot).value || null;
+              const sec = (sections || []).find(s => s.id === sectionId);
+              try {
+                const out = await API.insert('students', [{ name, pin: $('#fStuPin', mroot).value.trim() || null, parent_whatsapp: $('#fStuWa', mroot).value.replace(/[^\d]/g, '') || null, section_id: sectionId, school_id: sec ? sec.school_id : ((schools && schools[0]) || {}).id || null }]);
+                await audit('create', 'students', out && out[0] ? out[0].id : null, { name });
+                closeModal(); toast(t('saved'), 'success'); AdminPages.students(root);
+              } catch (e) { toast(t('dbError'), 'error'); }
+            });
+          }
+        });
+      });
+
+      $$('[data-edit-student]', root).forEach(b => b.addEventListener('click', () => {
+        const s = students.find(x => x.id === b.dataset.editStudent);
+        openModal({
+          title: (getLang() === 'ar' ? 'تعديل الطالب: ' : 'Edit student: ') + s.name,
+          bodyHtml: `
+            <div class="form-row"><div><label>${t('name')} *</label><input class="input" id="fStuName" value="${escapeHtml(s.name)}"></div></div>
+            <div class="form-row cols-2">
+              <div><label>PIN</label><input class="input" id="fStuPin" dir="ltr" value="${escapeHtml(s.pin || '')}"></div>
+              <div><label>WhatsApp</label><input class="input" id="fStuWa" dir="ltr" value="${escapeHtml(s.parent_whatsapp || '')}"></div>
+            </div>
+            <div class="form-row"><div><label>${t('section')}</label><select class="input" id="fStuSection">${sectionOptions('', s.section_id || '')}</select></div></div>`,
+          footHtml: `<button class="btn ghost" data-close-modal>${t('cancel')}</button><button class="btn primary" id="saveStuEditBtn">${t('save')}</button>`,
+          onOpen(mroot) {
+            $('#saveStuEditBtn', mroot).addEventListener('click', async () => {
+              const name = $('#fStuName', mroot).value.trim();
+              if (!name) return toast(t('required'), 'error');
+              const sectionId = $('#fStuSection', mroot).value || null;
+              const sec = (sections || []).find(x => x.id === sectionId);
+              await API.update('students', 'id=eq.' + s.id, { name, pin: $('#fStuPin', mroot).value.trim() || null, parent_whatsapp: $('#fStuWa', mroot).value.replace(/[^\d]/g, '') || null, section_id: sectionId, school_id: sec ? sec.school_id : s.school_id });
+              await audit('update', 'students', s.id, { name });
+              closeModal(); toast(t('saved'), 'success'); AdminPages.students(root);
+            });
+          }
+        });
+      }));
+
+      $$('[data-login-student]', root).forEach(b => b.addEventListener('click', () => {
+        const s = students.find(x => x.id === b.dataset.loginStudent);
+        if (s.user_id) {
+          // Has an account — offer password reset
+          openModal({
+            title: (getLang() === 'ar' ? 'إعادة تعيين كلمة مرور حساب: ' : 'Reset password for: ') + s.name,
+            bodyHtml: `<div class="form-row"><div><label>${t('newPassword')} *</label><input class="input" id="fStuNewPass" dir="ltr" type="text" placeholder="min 6 chars"></div></div>`,
+            footHtml: `<button class="btn ghost" data-close-modal>${t('cancel')}</button><button class="btn primary" id="doStuPassBtn">${t('save')}</button>`,
+            onOpen(mroot) {
+              $('#doStuPassBtn', mroot).addEventListener('click', async () => {
+                const pass = $('#fStuNewPass', mroot).value;
+                if (pass.length < 6) return toast(t('required') + ' (≥6)', 'error');
+                await API.update('profiles', 'id=eq.' + s.user_id, { password_hash: sha256Sync(pass) });
+                await audit('reset-password', 'profiles', s.user_id, { student: s.name });
+                closeModal(); toast(t('saved'), 'success');
+              });
+            }
+          });
+          return;
+        }
+        openModal({
+          title: (getLang() === 'ar' ? 'إنشاء حساب دخول للطالب: ' : 'Create login for: ') + s.name,
+          bodyHtml: `
+            <div class="form-row"><div><label>${t('email')} *</label><input class="input" id="fStuEmail" dir="ltr" type="email" placeholder="student@school.com"></div></div>
+            <div class="form-row"><div><label>${t('password')} *</label><input class="input" id="fStuPass" dir="ltr" type="text" placeholder="min 6 chars"></div></div>
+            <p class="small muted">${getLang() === 'ar' ? 'سيتم ربط الحساب ببطاقة الطالب تلقائياً.' : 'The account will be linked to this student record automatically.'}</p>`,
+          footHtml: `<button class="btn ghost" data-close-modal>${t('cancel')}</button><button class="btn primary" id="createStuLoginBtn">${t('save')}</button>`,
+          onOpen(mroot) {
+            $('#createStuLoginBtn', mroot).addEventListener('click', async () => {
+              const email = $('#fStuEmail', mroot).value.trim().toLowerCase(), pass = $('#fStuPass', mroot).value;
+              if (!email || pass.length < 6) return toast(t('required') + ' (≥6)', 'error');
+              try {
+                const out = await API.insert('profiles', [{ name: s.name, email, password_hash: sha256Sync(pass), role: 'student', school_id: s.school_id || null }]);
+                const newId = out && out[0] ? out[0].id : null;
+                if (newId) await API.update('students', 'id=eq.' + s.id, { user_id: newId });
+                await audit('create', 'profiles', newId, { student: s.name, email });
+                closeModal(); toast(t('saved'), 'success'); AdminPages.students(root);
+              } catch (e) { toast(String(e.message || e).includes('duplicate') ? 'Email exists' : t('dbError'), 'error'); }
+            });
+          }
+        });
+      }));
+
+      $$('[data-del-student]', root).forEach(b => b.addEventListener('click', () => {
+        const s = students.find(x => x.id === b.dataset.delStudent);
+        confirmModal(t('confirmDelete') + ' ' + s.name + (s.user_id ? (getLang() === 'ar' ? ' (وسيُحذف حساب الدخول المرتبط أيضاً)' : ' (linked login account will also be deleted)') : ''), async () => {
+          if (s.user_id) { try { await API.remove('profiles', 'id=eq.' + s.user_id); } catch (e) {} }
+          await API.remove('students', 'id=eq.' + s.id);
+          await audit('delete', 'students', s.id, { name: s.name });
+          toast(t('deleted'), 'success'); AdminPages.students(root);
+        }, true);
+      }));
+    };
+    render();
   },
 
   /* ========== 5) Subscriptions ========== */
@@ -261,6 +413,7 @@ const AdminPages = {
         </div>`;
       $$('[data-sub-set]', root).forEach(b => b.addEventListener('click', async () => {
         await API.update('schools', 'id=eq.' + b.dataset.id, { subscription_status: b.dataset.subSet });
+        await audit('subscription', 'schools', b.dataset.id, { subscription_status: b.dataset.subSet });
         toast(t('saved'), 'success'); render();
       }));
     };
