@@ -327,7 +327,7 @@ end $$;
 --        values ('Al-Noor International School','NOOR001','pro','active');
 --        insert into profiles (email, password_hash, name, role, phone, status)
 --        values ('you@school.com', '<hash above>', 'MR. YOUR NAME', 'admin', '9665xxxxxxxx', 'active');
---   3) sign in at the deployed site with email or phone + password, then OTP.
+--   3) sign in at the deployed site with email or phone + password.
 -- Optional demo CONTENT (curricula/chemistry reference) may be inserted separately;
 -- the live project mxseuwlhhkqkpgofecoa already carries a Grade-12 chemistry pack.
 -- ============================================================

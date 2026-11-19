@@ -110,30 +110,6 @@ const App = {
       btn.disabled = true; $('#loginError').classList.add('hidden');
       try { await this.doLogin(email, pass); } finally { btn.disabled = false; }
     });
-    // OTP step wiring
-    $('#otpVerifyBtn').addEventListener('click', async () => {
-      const pending = this.state.pendingUser;
-      const err = $('#otpError');
-      const btn = $('#otpVerifyBtn');
-      const code = $('#otpCode').value.replace(/\D/g, '').slice(0, 6);
-      if (!pending || code.length < 6) return;
-      btn.disabled = true; err.classList.add('hidden');
-      try {
-        const ok = await API.verifyOtp(pending.email, code);
-        if (!ok) { err.textContent = t('otpWrong'); err.classList.remove('hidden'); return; }
-        this.state.pendingUser = null;
-        await this.finishLogin(pending);
-      } catch (e) {
-        err.textContent = t('otpWrong'); err.classList.remove('hidden');
-      } finally { btn.disabled = false; }
-    });
-    $('#otpCode').addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); $('#otpVerifyBtn').click(); } });
-    $('#otpResendBtn').addEventListener('click', async () => {
-      const p = this.state.pendingUser; if (!p) return;
-      try { await API.sendOtp(p.email); toast(t('otpSent'), 'success'); } catch (e) { toast(t('otpSendFailed'), 'error'); }
-    });
-    $('#otpBackBtn').addEventListener('click', () => this.hideOtpStep());
-
     const saved = Session.get();
     if (saved) { this.state.user = saved; await this.showApp(); await this.processPendingCheckin(); }
     else { this.showLogin(); }
@@ -143,13 +119,6 @@ const App = {
     const errEl = $('#loginError');
     try {
       const user = await API.login(identifier, password);
-      if (AMAMB_CONFIG.OTP_REQUIRED !== false) {
-        try { await API.sendOtp(user.email); }
-        catch (e) { errEl.textContent = t('otpSendFailed'); errEl.classList.remove('hidden'); return; }
-        this.state.pendingUser = user;
-        this.showOtpStep(user.email);
-        return;
-      }
       await this.finishLogin(user);
     } catch (e) {
       const code = (e && e.message) || '';
@@ -157,25 +126,9 @@ const App = {
       errEl.classList.remove('hidden');
     }
   },
-  showOtpStep(email) {
-    $('#otpEmail').textContent = email;
-    $('#otpCode').value = '';
-    $('#otpError').classList.add('hidden');
-    $('#loginForm').classList.add('hidden');
-    $('#langToggleLogin').classList.add('hidden');
-    $('#otpView').classList.remove('hidden');
-    setTimeout(() => $('#otpCode').focus(), 50);
-  },
-  hideOtpStep() {
-    this.state.pendingUser = null;
-    $('#otpView').classList.add('hidden');
-    $('#loginForm').classList.remove('hidden');
-    $('#langToggleLogin').classList.remove('hidden');
-  },
   async finishLogin(user) {
     Session.set(user); this.state.user = user;
     $('#loginView').classList.add('hidden');
-    $('#otpView').classList.add('hidden');
     $('#appView').classList.remove('hidden');
     await this.showApp();
     await this.processPendingCheckin();
@@ -188,7 +141,6 @@ const App = {
     $('#appView').classList.add('hidden');
     $('#loginView').classList.remove('hidden');
     $('#loginPassword').value = '';
-    this.hideOtpStep();
   },
 
   showLogin() { $('#appView').classList.add('hidden'); $('#loginView').classList.remove('hidden'); },

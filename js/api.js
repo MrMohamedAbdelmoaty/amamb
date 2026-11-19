@@ -115,8 +115,7 @@ const API = {
     return out;
   },
   // auth -----------------------------------------------------------
-  // Identifier = email OR phone. On success the app may require a one-time
-  // code sent to the account email (AMAMB_CONFIG.OTP_REQUIRED).
+  // Identifier = email OR phone; password verified against the stored SHA-256.
   async login(identifier, password) {
     const hash = sha256Sync(password);
     const value = String(identifier || '').trim();
@@ -137,23 +136,6 @@ const API = {
     }
     return u;
   },
-  async sendOtp(email) {
-    const res = await fetch(AMAMB_CONFIG.SUPABASE_URL + '/auth/v1/otp', {
-      method: 'POST',
-      headers: Object.assign({ 'Content-Type': 'application/json' }, this.headers()),
-      body: JSON.stringify({ email: String(email || '').trim().toLowerCase(), create_user: true })
-    });
-    if (!res.ok) throw new Error('OTP_SEND');
-    return true;
-  },
-  async verifyOtp(email, token) {
-    const res = await fetch(AMAMB_CONFIG.SUPABASE_URL + '/auth/v1/verify', {
-      method: 'POST',
-      headers: Object.assign({ 'Content-Type': 'application/json' }, this.headers()),
-      body: JSON.stringify({ email: String(email || '').trim().toLowerCase(), token: String(token || '').trim(), type: 'email' })
-    });
-    return res.ok;
-  }
 };
 
 /* ---------- Session ---------- */
