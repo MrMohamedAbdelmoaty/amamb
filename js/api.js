@@ -103,21 +103,23 @@ const API = {
     const out = await this.req(table + '?' + query, { method: 'DELETE', prefer: 'return=representation' });
     return out;
   },
-  // auth — server-side check (password hash never leaves the database)
+  // auth -----------------------------------------------------------
+  // NOTE: hashing happens client-side (demo). Server-side verification is
+  // pending — tracked in the repo TODO.
   async login(email, password) {
-    const res = await fetch(AMAMB_CONFIG.SUPABASE_URL + '/functions/v1/amamb-login', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email: String(email || '').trim().toLowerCase(), password: String(password || '') })
-    });
-    let data = null;
-    try { data = await res.json(); } catch (e) { /* fall through */ }
-    if (!res.ok) {
-      const code = data && data.error;
-      if (code === 'INVALID_CREDENTIALS' || code === 'SCHOOL_SUSPENDED') throw new Error(code);
-      throw new Error('DB');
+    const hash = sha256Sync(password);
+    const rows = await this.select('profiles',
+      'select=id,email,name,role,school_id&email=eq.' + encodeURIComponent(email.trim().toLowerCase()) + '&password_hash=eq.' + hash);
+    if (!rows || !rows.length) throw new Error('INVALID_CREDENTIALS');
+    const u = rows[0];
+    if (u.role !== 'admin' && u.school_id) {
+      const sch = await this.select('schools', 'select=id,name,subscription_status&id=eq.' + u.school_id);
+      if (sch && sch.length && sch[0].subscription_status === 'suspended') {
+        throw new Error('SCHOOL_SUSPENDED');
+      }
+      u.school_name = sch && sch.length ? sch[0].name : '';
     }
-    return data;
+    return u;
   }
 };
 
