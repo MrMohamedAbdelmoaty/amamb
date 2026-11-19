@@ -1,0 +1,12 @@
+# dependencies / build
+node_modules/
+dist/
+.next/
+.vite/
+.DS_Store
+# local env & secrets
+.env
+.env.*
+*.local
+# logs
+*.log
