@@ -35,6 +35,17 @@ AMAMB منصة تعليمية متعددة المدارس للمعلمين وا�
 
 المنصة ملفات ثابتة — ارفعها كما هي على أي استضافة ثابتة (GitHub Pages, Netlify, Vercel, Cloudflare Pages) وافتح `index.html`. الموقع المرجعي يعمل على GitHub Pages من الفرع `main`.
 
+### Render (Static Site)
+
+المشروع يحتوي على `render.yaml` جاهز للنشر على Render كموقع ثابت:
+
+1. من Render: **New + → Blueprint** (أو Static Site) واربط الريبو `MrMohamedAbdelmoaty/amamb`.
+2. اختار `render.yaml` / أو إعدادات: Build Command: `echo "AMAMB is a static site — no build step"` و Publish Directory: `.`
+3. اضغط Deploy — هتاخد دومين مجاني `amamb.onrender.com` (أو أي اسم تختاره) + HTTPS تلقائي، والنشر التالي بيتم تلقائياً مع كل push على `main`.
+   - أو مباشرة من الزر: https://render.com/deploy?repo=https://github.com/MrMohamedAbdelmoaty/amamb
+
+لا تحتاج أي متغيرات بيئة: الواجهة بتكلم Supabase مباشرة، و`js/config.js` فيه anon key العام فقط (مسموح يكون ظاهر للعلن في تطبيقات Supabase). لا تحط service role key في أي ملف واجهة.
+
 ## إعادة بناء قاعدة البيانات
 
 `sql/schema.sql` — نسخة مرجعية من المخطط الكامل (الجدول الأصلي + إضافات v2: المناهج، الوحدات، الدروس، المرفقات، الأسئلة، الاختبارات، محاولات الاختبار، الكيمياء، الرسائل، سجل الأنشطة، وعمود حالة الحساب). لا تتضمن حسابات ديمو — أنشئ مديرك الحقيقي بتعليمات الملف.

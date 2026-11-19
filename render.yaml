@@ -1,0 +1,21 @@
+services:
+  - type: web
+    name: amamb
+    runtime: static
+    plan: free
+    buildCommand: echo "AMAMB is a static site — no build step"
+    staticPublishPath: .
+    pullRequestPreviewsEnabled: false
+    headers:
+      - path: /index.html
+        name: Cache-Control
+        value: no-cache
+      - path: /css/*
+        name: Cache-Control
+        value: public, max-age=31536000, immutable
+      - path: /js/*
+        name: Cache-Control
+        value: public, max-age=31536000, immutable
+      - path: /vendor/*
+        name: Cache-Control
+        value: public, max-age=31536000, immutable
